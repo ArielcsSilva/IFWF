@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit3 } from "lucide-react";
 import { base44 } from "@/api/base44";
 
 const COLUMNS = ["To Do", "In Progress", "Done"];
@@ -14,6 +14,9 @@ export default function BoardView() {
   const [newTitle, setNewTitle] = useState("");
   const [newContent, setNewContent] = useState("");
   const [error, setError] = useState("");
+  const [editingCardId, setEditingCardId] = useState(null);
+  const [editingCardTitle, setEditingCardTitle] = useState("");
+  const [editingCardContent, setEditingCardContent] = useState("");
 
   useEffect(() => {
     const loadBoard = async () => {
@@ -62,6 +65,29 @@ export default function BoardView() {
     if (!confirm("Delete this card?")) return;
     await base44.entities.Card.delete(cardId);
     await updateBoardCards();
+  };
+
+  const startEditingCard = (card) => {
+    setEditingCardId(card.id);
+    setEditingCardTitle(card.title || "");
+    setEditingCardContent(card.content || "");
+  };
+
+  const saveCardEdits = async (cardId) => {
+    await base44.entities.Card.update(cardId, {
+      title: editingCardTitle.trim() || "Untitled card",
+      content: editingCardContent.trim(),
+    });
+    setEditingCardId(null);
+    setEditingCardTitle("");
+    setEditingCardContent("");
+    await updateBoardCards();
+  };
+
+  const cancelCardEdit = () => {
+    setEditingCardId(null);
+    setEditingCardTitle("");
+    setEditingCardContent("");
   };
 
   const deleteBoard = async () => {
@@ -165,23 +191,75 @@ export default function BoardView() {
                     {cardsByColumn[column]?.map((card) => (
                       <div
                         key={card.id}
-                        draggable
+                        draggable={editingCardId !== card.id}
                         onDragStart={(event) => event.dataTransfer.setData("text/plain", card.id)}
                         className="rounded-3xl border border-border bg-white p-4 shadow-sm transition hover:shadow-md"
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <h4 className="text-sm font-semibold">{card.title}</h4>
-                            <p className="mt-2 text-sm text-muted-foreground">{card.content || "No description"}</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => deleteCard(card.id)}
-                            className="rounded-full p-2 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
+                        {editingCardId === card.id ? (
+                          <form
+                            className="space-y-4"
+                            onSubmit={async (event) => {
+                              event.preventDefault();
+                              await saveCardEdits(card.id);
+                            }}
                           >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
+                            <label className="block text-sm font-medium text-foreground">
+                              Title
+                              <input
+                                value={editingCardTitle}
+                                onChange={(event) => setEditingCardTitle(event.target.value)}
+                                className="mt-2 w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary"
+                              />
+                            </label>
+                            <label className="block text-sm font-medium text-foreground">
+                              Content
+                              <textarea
+                                value={editingCardContent}
+                                onChange={(event) => setEditingCardContent(event.target.value)}
+                                rows={3}
+                                className="mt-2 w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary"
+                              />
+                            </label>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="submit"
+                                className="inline-flex items-center justify-center rounded-2xl bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+                              >
+                                Save
+                              </button>
+                              <button
+                                type="button"
+                                onClick={cancelCardEdit}
+                                className="inline-flex items-center justify-center rounded-2xl border border-border px-4 py-2 text-sm text-muted-foreground transition hover:bg-muted"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </form>
+                        ) : (
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <h4 className="text-sm font-semibold">{card.title}</h4>
+                              <p className="mt-2 text-sm text-muted-foreground">{card.content || "No description"}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => startEditingCard(card)}
+                                className="rounded-full p-2 text-muted-foreground transition hover:bg-primary/10 hover:text-primary"
+                              >
+                                <Edit3 className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => deleteCard(card.id)}
+                                className="rounded-full p-2 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
